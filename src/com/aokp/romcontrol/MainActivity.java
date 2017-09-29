@@ -33,6 +33,7 @@ import android.view.View;
 import com.aokp.romcontrol.fragments.NavigationDrawerFragment;
 
 import com.aokp.romcontrol.fragments.ButtonSettingsFragment;
+import com.aokp.romcontrol.fragments.ChangelogFragment;
 import com.aokp.romcontrol.fragments.LockScreenSettingsFragment;
 import com.aokp.romcontrol.fragments.NotificationsDrawerFragment;
 import com.aokp.romcontrol.fragments.PowerMenuSettingsFragment;
@@ -53,6 +54,11 @@ import com.aokp.romcontrol.fragments.general.HostnamePreference;
 import com.aokp.romcontrol.fragments.general.RecentsSettingsFragment;
 import com.aokp.romcontrol.fragments.general.WakelockBlockerFragment;
 
+import com.aokp.romcontrol.fragments.pie.PieColorFragment;
+import com.aokp.romcontrol.fragments.pie.PieControlFragment;
+import com.aokp.romcontrol.fragments.pie.PieTabHostFragment;
+import com.aokp.romcontrol.fragments.pie.PieTargetsFragment;
+
 import com.aokp.romcontrol.fragments.sound.SoundTabHostFragment;
 import com.aokp.romcontrol.fragments.sound.SoundSettingsFragment;
 import com.aokp.romcontrol.fragments.sound.LiveVolumeFragment;
@@ -64,6 +70,7 @@ import com.aokp.romcontrol.fragments.statusbar.TrafficSettingsFragment;
 import com.aokp.romcontrol.fragments.ui.UITabHostFragment;
 import com.aokp.romcontrol.fragments.ui.AnimBarPreference;
 import com.aokp.romcontrol.fragments.ui.AnimationControls;
+import com.aokp.romcontrol.fragments.ui.BlurPersonalizations;
 import com.aokp.romcontrol.fragments.ui.DisplayAnimationsSettings;
 import com.aokp.romcontrol.fragments.ui.TransparencyPornFragment;
 
@@ -148,19 +155,27 @@ public class MainActivity extends Activity
                 break;
 
             case 6:
-                fragment = new PowerMenuSettingsFragment();
+                fragment = new PieTabHostFragment();
                 break;
 
             case 7:
-                fragment = new SoundTabHostFragment();
+                fragment = new PowerMenuSettingsFragment();
                 break;
 
             case 8:
-                fragment = new StatusBarTabHostFragment();
+                fragment = new SoundTabHostFragment();
                 break;
 
             case 9:
+                fragment = new StatusBarTabHostFragment();
+                break;
+
+            case 10:
                 fragment = new UITabHostFragment();
+                break;
+
+            case 11:
+                fragment = new ChangelogFragment();
                 break;
         }
         return fragment;

@@ -21,8 +21,12 @@ import android.app.Fragment;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.UserHandle;
 import android.preference.ListPreference;
@@ -33,16 +37,21 @@ import android.preference.PreferenceFragment;
 import android.preference.PreferenceScreen;
 import android.preference.SwitchPreference;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import com.aokp.romcontrol.R;
+import com.aokp.romcontrol.util.Helpers;
+import com.aokp.romcontrol.widgets.SeekBarPreferenceCham;
 import cyanogenmod.providers.CMSettings;
 
 public class NotificationsDrawerFragment extends Fragment {
@@ -77,6 +86,19 @@ public class NotificationsDrawerFragment extends Fragment {
         private static final String PREF_SMART_PULLDOWN = "smart_pulldown";
         private static final String STATUS_BAR_QUICK_QS_PULLDOWN = "qs_quick_pulldown";
 
+        private static final String CUSTOM_HEADER_IMAGE = "status_bar_custom_header";
+        private static final String DAYLIGHT_HEADER_PACK = "daylight_header_pack";
+        private static final String DEFAULT_HEADER_PACKAGE = "com.android.systemui";
+        private static final String CUSTOM_HEADER_IMAGE_SHADOW = "status_bar_custom_header_shadow";
+        private static final String CUSTOM_HEADER_PROVIDER = "custom_header_provider";
+        private static final String CUSTOM_HEADER_BROWSE = "custom_header_browse";
+        private static final String NOTIFICATION_GUTS_KILL_APP_BUTTON = "notification_guts_kill_app_button";
+
+        private static final String WEATHER_CATEGORY = "weather_category";
+        private static final String WEATHER_SERVICE_PACKAGE = "org.omnirom.omnijaws";
+        private static final String PREF_STATUS_BAR_WEATHER = "status_bar_weather";
+
+        private ListPreference mDaylightHeaderPack;
         private ListPreference mTileAnimationStyle;
         private ListPreference mTileAnimationDuration;
         private ListPreference mTileAnimationInterpolator;
@@ -86,6 +108,13 @@ public class NotificationsDrawerFragment extends Fragment {
         private ListPreference mQsColumns;
         private ListPreference mSmartPulldown;
         private ListPreference mQuickPulldown;
+        private SeekBarPreferenceCham mHeaderShadow;
+        private ListPreference mHeaderProvider;
+        private PreferenceCategory mWeatherCategory;
+
+        private String mDaylightHeaderProvider;
+        private PreferenceScreen mHeaderBrowse;
+        private Preference mNotificationKill;
 
         private ContentResolver mResolver;
 
@@ -100,7 +129,9 @@ public class NotificationsDrawerFragment extends Fragment {
             addPreferencesFromResource(R.xml.fragment_notificationsdrawer_settings);
             mResolver = getActivity().getContentResolver();
             PreferenceScreen prefSet = getPreferenceScreen();
+            PackageManager pm = getActivity().getPackageManager();
             int defaultValue;
+            mWeatherCategory = (PreferenceCategory) prefSet.findPreference(WEATHER_CATEGORY);
 
             // QS tile animation
             mTileAnimationStyle = (ListPreference) findPreference(PREF_TILE_ANIM_STYLE);
@@ -171,6 +202,59 @@ public class NotificationsDrawerFragment extends Fragment {
             updatePulldownSummary(quickPulldown);
             mQuickPulldown.setOnPreferenceChangeListener(this);
 
+            String settingHeaderPackage = Settings.System.getString(mResolver,
+                    Settings.System.STATUS_BAR_DAYLIGHT_HEADER_PACK);
+            if (settingHeaderPackage == null) {
+                settingHeaderPackage = DEFAULT_HEADER_PACKAGE;
+            }
+            mDaylightHeaderPack = (ListPreference) findPreference(DAYLIGHT_HEADER_PACK);
+
+            List<String> entries = new ArrayList<String>();
+            List<String> values = new ArrayList<String>();
+            getAvailableHeaderPacks(entries, values);
+            mDaylightHeaderPack.setEntries(entries.toArray(new String[entries.size()]));
+            mDaylightHeaderPack.setEntryValues(values.toArray(new String[values.size()]));
+
+            int valueIndex = mDaylightHeaderPack.findIndexOfValue(settingHeaderPackage);
+            if (valueIndex == -1) {
+                // no longer found
+                settingHeaderPackage = DEFAULT_HEADER_PACKAGE;
+                Settings.System.putString(mResolver,
+                        Settings.System.STATUS_BAR_DAYLIGHT_HEADER_PACK, settingHeaderPackage);
+                valueIndex = mDaylightHeaderPack.findIndexOfValue(settingHeaderPackage);
+            }
+            mDaylightHeaderPack.setValueIndex(valueIndex >= 0 ? valueIndex : 0);
+            mDaylightHeaderPack.setSummary(mDaylightHeaderPack.getEntry());
+            mDaylightHeaderPack.setOnPreferenceChangeListener(this);
+
+            mHeaderShadow = (SeekBarPreferenceCham) findPreference(CUSTOM_HEADER_IMAGE_SHADOW);
+            final int headerShadow = Settings.System.getInt(mResolver,
+                    Settings.System.STATUS_BAR_CUSTOM_HEADER_SHADOW, 80);
+            mHeaderShadow.setValue((int)(((double) headerShadow / 255) * 100));
+            mHeaderShadow.setOnPreferenceChangeListener(this);
+
+            mDaylightHeaderProvider = getResources().getString(R.string.daylight_header_provider);
+            String providerName = Settings.System.getString(mResolver,
+                    Settings.System.STATUS_BAR_CUSTOM_HEADER_PROVIDER);
+            if (providerName == null) {
+                providerName = mDaylightHeaderProvider;
+            }
+            mHeaderProvider = (ListPreference) findPreference(CUSTOM_HEADER_PROVIDER);
+            valueIndex = mHeaderProvider.findIndexOfValue(providerName);
+            mHeaderProvider.setValueIndex(valueIndex >= 0 ? valueIndex : 0);
+            mHeaderProvider.setSummary(mHeaderProvider.getEntry());
+            mHeaderProvider.setOnPreferenceChangeListener(this);
+            mDaylightHeaderPack.setEnabled(providerName.equals(mDaylightHeaderProvider));
+            mHeaderBrowse = (PreferenceScreen) findPreference(CUSTOM_HEADER_BROWSE);
+            mHeaderBrowse.setEnabled(isBrowseHeaderAvailable());
+
+            mNotificationKill = findPreference(NOTIFICATION_GUTS_KILL_APP_BUTTON);
+            mNotificationKill.setOnPreferenceChangeListener(this);
+
+            // Status bar weather category
+            if (mWeatherCategory != null && (!Helpers.isPackageInstalled(WEATHER_SERVICE_PACKAGE, pm))) {
+                prefSet.removePreference(mWeatherCategory);
+            }
             setHasOptionsMenu(true);
             return prefSet;
         }
@@ -212,7 +296,7 @@ public class NotificationsDrawerFragment extends Fragment {
                         Settings.Secure.QQS_COUNT, SysuiQqsCountValue);
                 int SysuiQqsCountIndex = mSysuiQqsCount.findIndexOfValue(SysuiQqsCount);
                 mSysuiQqsCount.setSummary(mSysuiQqsCount.getEntries()[SysuiQqsCountIndex]);
-            return true;
+                return true;
             } else if (preference == mRowsPortrait) {
                 intValue = Integer.valueOf((String) newValue);
                 index = mRowsPortrait.findIndexOfValue((String) newValue);
@@ -242,9 +326,35 @@ public class NotificationsDrawerFragment extends Fragment {
                 return true;
             } else if (preference == mQuickPulldown) {
                 int quickPulldown = Integer.valueOf((String) newValue);
-                CMSettings.System.putInt(
-                        mResolver, CMSettings.System.STATUS_BAR_QUICK_QS_PULLDOWN, quickPulldown);
+                CMSettings.System.putInt(mResolver,
+                        CMSettings.System.STATUS_BAR_QUICK_QS_PULLDOWN, quickPulldown);
                 updatePulldownSummary(quickPulldown);
+                return true;
+            } else if (preference == mDaylightHeaderPack) {
+                String value = (String) newValue;
+                Settings.System.putString(mResolver,
+                        Settings.System.STATUS_BAR_DAYLIGHT_HEADER_PACK, value);
+                int valueIndex = mDaylightHeaderPack.findIndexOfValue(value);
+                mDaylightHeaderPack.setSummary(mDaylightHeaderPack.getEntries()[valueIndex]);
+                return true;
+            } else if (preference == mHeaderShadow) {
+                Integer headerShadow = (Integer) newValue;
+                int realHeaderValue = (int) (((double) headerShadow / 100) * 255);
+                Settings.System.putInt(mResolver,
+                        Settings.System.STATUS_BAR_CUSTOM_HEADER_SHADOW, realHeaderValue);
+                return true;
+            } else if (preference == mHeaderProvider) {
+                String value = (String) newValue;
+                Settings.System.putString(mResolver,
+                        Settings.System.STATUS_BAR_CUSTOM_HEADER_PROVIDER, value);
+                int valueIndex = mHeaderProvider.findIndexOfValue(value);
+                mHeaderProvider.setSummary(mHeaderProvider.getEntries()[valueIndex]);
+                mDaylightHeaderPack.setEnabled(value.equals(mDaylightHeaderProvider));
+                return true;
+            } else if (preference == mNotificationKill) {
+                // Setting will only apply to new created notifications.
+                // By restarting SystemUI, we can re-create all notifications
+                Helpers.showSystemUIrestartDialog(getActivity());
                 return true;
             }
             return false;
@@ -307,6 +417,51 @@ public class NotificationsDrawerFragment extends Fragment {
                         : R.string.status_bar_quick_qs_pulldown_summary_right);
                 mQuickPulldown.setSummary(res.getString(R.string.status_bar_quick_qs_pulldown_summary, direction));
             }
+        }
+
+        private void getAvailableHeaderPacks(List<String> entries, List<String> values) {
+            String defaultLabel = null;
+            Map<String, String> headerMap = new HashMap<String, String>();
+            Intent i = new Intent();
+            PackageManager packageManager = getActivity().getPackageManager();
+            i.setAction("org.omnirom.DaylightHeaderPack");
+            for (ResolveInfo r : packageManager.queryIntentActivities(i, 0)) {
+                String packageName = r.activityInfo.packageName;
+                String label = r.activityInfo.loadLabel(getActivity().getPackageManager()).toString();
+                if (label == null) {
+                    label = r.activityInfo.packageName;
+                }
+                if (packageName.equals(DEFAULT_HEADER_PACKAGE)) {
+                    defaultLabel = label;
+                } else {
+                    headerMap.put(label, packageName);
+                }
+            }
+            i.setAction("org.omnirom.DaylightHeaderPack1");
+            for (ResolveInfo r : packageManager.queryIntentActivities(i, 0)) {
+                String packageName = r.activityInfo.packageName;
+                String label = r.activityInfo.loadLabel(getActivity().getPackageManager()).toString();
+                if (label == null) {
+                    label = packageName;
+                }
+                headerMap.put(label, packageName  + "/" + r.activityInfo.name);
+            }
+            List<String> labelList = new ArrayList<String>();
+            labelList.addAll(headerMap.keySet());
+            Collections.sort(labelList);
+            for (String label : labelList) {
+                entries.add(label);
+                values.add(headerMap.get(label));
+            }
+            entries.add(0, defaultLabel);
+            values.add(0, DEFAULT_HEADER_PACKAGE);
+        }
+
+        private boolean isBrowseHeaderAvailable() {
+            PackageManager pm = getActivity().getPackageManager();
+            Intent browse = new Intent();
+            browse.setClassName("org.omnirom.omnistyle", "org.omnirom.omnistyle.BrowseHeaderActivity");
+            return pm.resolveActivity(browse, 0) != null;
         }
     }
 }

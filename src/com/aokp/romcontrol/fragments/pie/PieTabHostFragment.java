@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.aokp.romcontrol.fragments.ui;
+package com.aokp.romcontrol.fragments.pie;
 
 import android.app.Fragment;
 import android.app.FragmentManager;
@@ -29,7 +29,7 @@ import android.view.ViewGroup;
 import com.aokp.romcontrol.R;
 import com.astuetz.viewpager.extensions.PagerSlidingTabStrip;
 
-public class UITabHostFragment extends Fragment {
+public class PieTabHostFragment extends Fragment {
     private static Context mContext;
 
     private TabAdapter mAdapter;
@@ -37,13 +37,12 @@ public class UITabHostFragment extends Fragment {
     private ViewPager mPager;
 
     private static final int[] mFragments = new int[] {
-            R.string.category_ui,
-            R.string.aokp_animation_title,
-            R.string.transparency_porn_title,
-            R.string.blur_ui_category_title
+            R.string.pa_pie_style_title,
+            R.string.pa_pie_targets_title,
+            R.string.pa_pie_color_title
     };
 
-    public UITabHostFragment() {
+    public PieTabHostFragment() {
     }
 
     @Override
@@ -59,7 +58,7 @@ public class UITabHostFragment extends Fragment {
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedinstanceState) {
-        View main = inflater.inflate(R.layout.fragment_ui_main, container, false);
+        View main = inflater.inflate(R.layout.fragment_statusbar_main, container, false);
         mAdapter = new TabAdapter(getChildFragmentManager());
         mPager = (ViewPager) main.findViewById(R.id.pager);
         mPager.setAdapter(mAdapter);
@@ -92,13 +91,11 @@ public class UITabHostFragment extends Fragment {
         public Fragment getItem(int position) {
             switch (position) {
                 case 0:
-                    return new DisplayAnimationsSettings();
+                    return new PieControlFragment();
                 case 1:
-                    return new AnimationControls();
+                    return new PieTargetsFragment();
                 case 2:
-                    return new TransparencyPornFragment();
-                case 3:
-                    return new BlurPersonalizations();
+                    return new PieColorFragment();
             }
             return null;
         }
